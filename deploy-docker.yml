@@ -2,6 +2,10 @@
 - hosts: dev
   become: True
   tasks:
+    - name: Install pip
+      apt-get:
+        name: pip
+        state: present
     - name: Install python3
       apt:
         name: python3
