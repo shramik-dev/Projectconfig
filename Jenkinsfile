@@ -1,15 +1,15 @@
 pipeline{
-    agent any
-    tools {
-      maven 'mvn'
-    }
+    agent {label 'node1'}
     environment {
-      DOCKER_TAG = getVersion()
+        PATH = "$PATH:/opt/maven/bin"
+        DOCKER_TAG = getVersion()
     }
     stages{
         stage('SCM'){
             steps{
-                git branch: 'shramik-dev-patch-1', url: 'https://github.com/shramik-dev/dockeransiblejenkins.git'
+                //git url: 'https://github.com/javahometech/dockeransiblejenkins.git'
+                //git branch: 'shramik-dev-patch-1', url: 'https://github.com/shramik-dev/dockeransiblejenkins.git'
+                git branch: 'main', url: 'https://github.com/shramik-dev/Projectconfig.git'
             }
         }
         stage('Maven Build'){
@@ -17,18 +17,35 @@ pipeline{
                 sh "mvn clean package"
             }
         }
-        stage('Docker Build'){
+    stage('SonarQube analysis') {
+    //  def scannerHome = tool 'SonarScanner 4.0';
+        steps{
+        withSonarQubeEnv('Sonarqube') { 
+        // If you have configured more than one global server connection, you can specify its name
+//      sh "${scannerHome}/bin/sonar-scanner"
+        sh "mvn sonar:sonar"
+    }
+        }
+        }
+    stage("Quality Gate") {
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+              }
+            }
+        }
+       stage('Docker Build'){
             steps{
-                sh "docker build . -t shramik999/webapp:${DOCKER_TAG} "
+                sh "sudo docker build . -t shramik999/webapp:${DOCKER_TAG} "
             }
         }
         stage('DockerHub Push'){
             steps{
                 withCredentials([string(credentialsId: 'docker-hub', variable: 'dockerHubPwd')]) {
-                    sh "docker login -u shramik999 -p ${dockerHubPwd}"
+                    sh " sudo docker login -u shramik999 -p ${dockerHubPwd}"
                 }
                 
-                sh "docker push shramik999/webapp:${DOCKER_TAG} "
+                sh "sudo docker push shramik999/webapp:${DOCKER_TAG} "
             }
         }
         stage('Docker Deploy'){
@@ -42,4 +59,4 @@ pipeline{
 def getVersion(){
     def commitHash = sh label: '', returnStdout: true, script: 'git rev-parse --short HEAD'
     return commitHash
-    }
+}
